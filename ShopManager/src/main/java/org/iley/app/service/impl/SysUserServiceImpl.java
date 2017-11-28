@@ -1,4 +1,4 @@
-package org.iley.app.serviceimpl;
+package org.iley.app.service.impl;
 
 import java.util.List;
 

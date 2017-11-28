@@ -1,6 +1,5 @@
 package org.iley.app.conf;
 
-import org.iley.app.security.UrlFilterSecurityInterceptor;
 import org.iley.app.security.UrlUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -9,56 +8,58 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.password.StandardPasswordEncoder;
-import org.springframework.security.web.access.intercept.FilterSecurityInterceptor;
 
 @Configuration
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
-	private static String PWD_KEYS = "btboy1978";
+	private static String PWD_KEYS = "24729138";
 
 	@Autowired
-	private UrlFilterSecurityInterceptor urlFilterSecurityInterceptor;
+	private UrlUserService urlUserService;
 
-	@Bean
-	UserDetailsService customUserService() { // 注册UserDetailsService 的bean
-		return new UrlUserService();
-	}
+	@Autowired
+	SessionRegistry sessionRegistry;
 
-	@Bean
-	StandardPasswordEncoder passwordEncoder() {
-		return new StandardPasswordEncoder(PWD_KEYS);
+	@Override
+	protected void configure(HttpSecurity http) throws Exception {
+		http.csrf().disable().authorizeRequests().antMatchers("/boopstrap/**").permitAll().antMatchers("/login").permitAll().antMatchers("/logout").permitAll()
+				.antMatchers("/images/**").permitAll().antMatchers("/js/**").permitAll().antMatchers("/css/**")
+				.permitAll().antMatchers("/fonts/**").permitAll().antMatchers("/favicon.ico").permitAll()
+				.antMatchers("/").permitAll().anyRequest().authenticated().and().sessionManagement().maximumSessions(1)
+				.sessionRegistry(sessionRegistry).and().and().logout().invalidateHttpSession(true)
+				.clearAuthentication(true).and().httpBasic();
 	}
 
 	@Override
 	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-		auth.userDetailsService(customUserService()).passwordEncoder(new PasswordEncoder() {
-
-			@Override
-			public boolean matches(CharSequence rawPassword, String encodedPassword) {
-				// TODO Auto-generated method stub
-				return encodedPassword.equals(passwordEncoder().encode(rawPassword));
-			}
+		auth.userDetailsService(urlUserService).passwordEncoder(new PasswordEncoder() {
 
 			@Override
 			public String encode(CharSequence rawPassword) {
-				// TODO Auto-generated method stub
-				return passwordEncoder().encode((String) rawPassword);
+				return encoding().encode((String) rawPassword);
 			}
 
+			@Override
+			public boolean matches(CharSequence rawPassword, String encodedPassword) {
+				return encodedPassword.equals(encoding().encode((String) rawPassword));
+			}
 		});
-
 	}
 
-	@Override
-	protected void configure(HttpSecurity http) throws Exception {
-		http.authorizeRequests().anyRequest().authenticated() // 任何请求,登录后可以访问
-				.and().formLogin().loginPage("/login").failureUrl("/login?error").permitAll() // 登录页面用户任意访问
-				.and().logout().permitAll(); // 注销行为任意访问
-		http.addFilterBefore(urlFilterSecurityInterceptor, FilterSecurityInterceptor.class).csrf().disable();
+	@Bean
+	StandardPasswordEncoder encoding() {
+		StandardPasswordEncoder encoder = new StandardPasswordEncoder(PWD_KEYS);
+		return encoder;
+	}
 
+	@Bean
+	public SessionRegistry getSessionRegistry() {
+		SessionRegistry sessionRegistry = new SessionRegistryImpl();
+		return sessionRegistry;
 	}
 }
